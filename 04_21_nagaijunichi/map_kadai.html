@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>ZipcodeMap</title>
+
+    <style>
+            html,body,#main {
+                height:100%;
+                width: 100%;
+            }
+            body {
+                padding:0;
+                margin:0;
+                background: gray;
+            }
+            h1 {
+                padding:0.5ex;
+                margin:0.5ex;
+                font-size:56px;
+                color:black;
+                text-align: center;
+            }
+            p {
+                margin-bottom: 5px;
+                text-align: center;
+                color: brown;
+            }
+    </style>
+
+</head>
+<body>
+
+    <script src="https://code.jquery.com/jquery-3.2.1.min.js" integrity="sha256-hwg4gsxgFZhOsEEamdOYGBf13FyQuiTwlAQgxVSNgt4=" crossorigin="anonymous"></script>
+    <script src='https://www.bing.com/api/maps/mapcontrol?callback=GetMap&key=ArnXoNRShleTymihSJAwzwv2uFEqVuQXJcYoHp3KDO7OkKgn64_PLSc5i5XYHluw' async defer></script>
+    <script src='bmap.js'></script>
+
+    <header>
+        <h1>ZipcodeMap</h1>
+        <!-- 郵便番号入力のテキストボックス -->
+        <p>※7桁の半角数字で郵便番号を入力してください</p>
+        <div id="form"><input type="text" id="zipcode" value="1070061" maxlength="7"><div>
+        <div id="btn"><input type="button" id="search_btn" value="郵便番号入力"><div>
+        
+        <!-- 検索結果の表示エリア -->
+        <div id="zip_result"></div>
+
+        <style>
+            #form {
+                text-align: center;
+            }
+            #btn {
+                text-align: center;
+                display:inline-block;
+            }
+            #zipcode {
+                width: 200px;
+                height: 30px;
+                text-align: center;
+                font-size: 2ex;
+            }
+            #search_btn {
+                margin-top: 10px;
+                margin-bottom: 20px;
+                width: 100px;
+                height: 30px;
+                font-size: 2ex;
+            }
+        </style>
+    </header>
+    
+    <div id="main">
+        <div id="myMap" style='width:100%; height:90%; margin-top:10px;'></div>
+    </div>
+
+    <script>
+    $(function () {
+        //検索ボタンをクリックされたときに実行
+        $("#search_btn").click(function () {
+            //入力値をセット
+            let param = {zipcode: $('#zipcode').val()}
+            //zipcloudのAPIのURL
+            let send_url = "http://zipcloud.ibsnet.co.jp/api/search";
+            $.ajax({
+                type: "GET",
+                cache: false,
+                data: param,
+                url: send_url,
+                dataType: "jsonp",
+                success: function (res) {
+                    //結果によって処理を振り分ける
+                    if (res.status == 200) {
+                        //処理が成功したとき
+                        //該当する住所を表示
+                        let html = '';
+                        for (let i = 0; i < res.results.length; i++) {
+                            let result = res.results[i];
+                            console.log(res.results);
+                            html += '<div>2桁の都道府県コード：' + result.prefcode + '</div>';
+                            html += '<div>都道府県：' + result.address1 + '</div>';
+                            html += '<div>市区町村・町域：' + result.address2 + result.address3 +'</div>';
+                            html += '<div>郵便番号（ZIPCODE）：' + result.zipcode +'</div>';
+                        }
+                        $('#zip_result').html(html);
+                    } else {
+                        //エラーだった時
+                        //エラー内容を表示
+                        $('#zip_result').html(res.message);
+                    }
+                },
+                error: function (XMLHttpRequest, textStatus, errorThrown) {
+                    console.log(XMLHttpRequest);
+                }
+            });
+        });
+    });
+
+        /**
+     * BingMapsControllerを読み込んだらGetMap()を実行
+     * @constructor
+     */
+    let map;             //MapObject用
+    let searchManager;   //SearchObject用
+    let pushpinOptions = {
+        icon: 'bigpins.png',
+        width: 0.05,
+        height: 0.05
+    }; 
+
+    function GetMap() {
+        //Map生成
+        map = new Microsoft.Maps.Map('#myMap', {
+            zoom: 5,
+            mapTypeId: Microsoft.Maps.MapTypeId.load
+        });
+        //検索モジュール指定
+        Microsoft.Maps.loadModule('Microsoft.Maps.Search', function () {
+            //searchManagerインスタンス化（Geocode,ReverseGeocodeが使用可能になる）
+            searchManager = new Microsoft.Maps.Search.SearchManager(map);
+            //Geocode：住所から検索
+            geocodeQuery(document.getElementById("zipcode").value);
+        });
+    }
+
+    /**
+     * 検索ボタン[Click:Event]
+     */
+    document.getElementById("search_btn").onclick = function(){
+        //4.Geocode:住所から検索
+        geocodeQuery(document.getElementById("zipcode").value);
+    };
+
+    /**
+     * 住所から緯度経度を取得
+     * @param query [住所文字列]
+     */
+    function geocodeQuery(query) {
+        if(searchManager) {
+            //住所から緯度経度を検索
+            searchManager.geocode({
+                where: query,       //検索文字列
+                callback: function (r) { //検索結果を"( r )" の変数で取得
+                    //最初の検索取得結果をMAPに表示
+                    if (r && r.results && r.results.length > 0) {
+                        //Pushpinを立てる
+                        const pin = new Microsoft.Maps.Pushpin(r.results[0].location, pushpinOptions);
+                        map.entities.push(pin);
+                        //map表示位置を再設定
+                        map.setView({ bounds: r.results[0].bestView});
+                        //取得した緯度経度をh1要素にJSON文字列にして表示
+                        console.log(r.results[0].location);
+                        document.getElementById("h3").innerText = JSON.stringify(r.results[0].location);
+                    }
+                },
+                errorCallback: function (e) {
+                    alert("見つかりません");
+                }
+            });
+        }
+    }
+    </script>
+</body>
+
+<footer>
+    <h3 id="h3">指定された住所の緯度・経度をここに表示します。</h3>
+    <style>
+    h3 {
+        font-size: 16px;
+        color: white;
+        text-align: center;
+        padding-bottom: 36px;
+    }
+    </style>
+</footer>
+</html>
